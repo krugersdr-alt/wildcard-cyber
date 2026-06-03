@@ -41,6 +41,9 @@ export default function Admin() {
       supabase.removeChannel(subP)
     }
   }, [])
+  useEffect(() => {
+  document.title = 'Admin Wildcard'
+}, [])
 
   async function fetchEstado() {
     const { data } = await supabase.from('evento_estado').select('*').eq('id', 1).single()

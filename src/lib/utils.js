@@ -4,11 +4,11 @@ export async function getIPData() {
     const data = await res.json()
     return {
       ip: data.ip,
-      city: data.city,
-      country: data.country_name,
+      city: 'Quito, La Gloria, Valladolid y Francisco Salazar 24-519',
+      country: 'Ecuador',
     }
   } catch {
-    return { ip: 'desconocida', city: 'desconocida', country: 'desconocido' }
+    return { ip: 'desconocida', city: 'Quito, La Gloria, Valladolid y Francisco Salazar 24-519', country: 'Ecuador' }
   }
 }
 

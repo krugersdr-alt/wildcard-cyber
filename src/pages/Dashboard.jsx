@@ -23,28 +23,30 @@ function generateLines(p) {
 export default function Dashboard() {
   const [participantes, setParticipantes] = useState([])
   const [streaming, setStreaming] = useState(false)
-  const [lines, setLines] = useState([])
+  const [cols, setCols] = useState([[], [], []])
   const [streamDone, setStreamDone] = useState(false)
-  const terminalRef = useRef(null)
+  const bottomRef = useRef(null)
 
   useEffect(() => {
     fetchParticipantes()
-
     const sub = supabase
       .channel('dashboard_participantes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'participantes' }, (payload) => {
-        setParticipantes((prev) => [payload.new, ...prev])
+        setParticipantes((prev) => [...prev, payload.new])
       })
       .subscribe()
-
     return () => supabase.removeChannel(sub)
   }, [])
 
   useEffect(() => {
-    if (terminalRef.current) {
-      terminalRef.current.scrollTop = terminalRef.current.scrollHeight
+    document.title = 'Dashboard Wildcard'
+  }, [])
+
+  useEffect(() => {
+    if (bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [lines])
+  }, [cols])
 
   async function fetchParticipantes() {
     const { data } = await supabase
@@ -57,14 +59,28 @@ export default function Dashboard() {
   async function iniciarStream() {
     if (streaming || participantes.length === 0) return
     setStreaming(true)
-    setLines([])
+    setCols([[], [], []])
     setStreamDone(false)
 
-    const allLines = participantes.flatMap(generateLines)
+    // Round-robin: participante 0 → col 0, participante 1 → col 1, etc.
+    const bloques = participantes.map((p, idx) => ({
+      col: idx % 3,
+      lines: generateLines(p),
+    }))
 
-    for (let i = 0; i < allLines.length; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 80 + Math.random() * 120))
-      setLines((prev) => [...prev, allLines[i]])
+    // Cada participante se muestra completo antes de pasar al siguiente
+    for (let bloqueIdx = 0; bloqueIdx < bloques.length; bloqueIdx++) {
+      const bloque = bloques[bloqueIdx]
+      for (let lineIdx = 0; lineIdx < bloque.lines.length; lineIdx++) {
+        await new Promise((resolve) => setTimeout(resolve, 40 + Math.random() * 80))
+        const col = bloque.col
+        const line = bloque.lines[lineIdx]
+        setCols((prev) => {
+          const next = [[...prev[0]], [...prev[1]], [...prev[2]]]
+          next[col] = [...next[col], line]
+          return next
+        })
+      }
     }
 
     setStreamDone(true)
@@ -95,7 +111,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* TERMINAL */}
+        {/* TERMINAL 3 COLUMNAS */}
         <div className="bg-black/80 border border-gray-800 rounded flex flex-col overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
             <div className="flex items-center gap-2">
@@ -119,28 +135,31 @@ export default function Dashboard() {
             </button>
           </div>
 
-          <div
-            ref={terminalRef}
-            className="overflow-y-auto p-4 space-y-0.5"
-            style={{ height: '55vh' }}
-          >
-            {lines.length === 0 && !streaming && (
+          <div className="p-4" style={{ minHeight: '75vh' }}>
+            {cols[0].length === 0 && cols[1].length === 0 && cols[2].length === 0 && !streaming && (
               <p className="text-gray-700 text-xs">
                 {participantes.length === 0
                   ? '$ esperando participantes...'
                   : `$ ${participantes.length} registros listos · presiona INICIAR EXFILTRACIÓN`}
               </p>
             )}
-            {lines.map((line, i) => (
-              <p key={i} className={`text-xs leading-relaxed ${line.color}`}>
-                {line.text}
-              </p>
-            ))}
+            <div className="grid grid-cols-3 gap-6">
+              {cols.map((colLines, colIdx) => (
+                <div key={colIdx} className="space-y-0.5">
+                  {colLines.map((line, i) => (
+                    <p key={i} className={`text-xs leading-relaxed break-all ${line.color}`}>
+                      {line.text}
+                    </p>
+                  ))}
+                </div>
+              ))}
+            </div>
             {streamDone && (
-              <p className="text-green-400 text-xs mt-2 animate-pulse">
+              <p className="text-green-400 text-xs mt-4 animate-pulse">
                 $ exfiltración completada · {participantes.length} registros procesados
               </p>
             )}
+            <div ref={bottomRef} />
           </div>
         </div>
 

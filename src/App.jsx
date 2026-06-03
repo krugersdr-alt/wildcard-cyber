@@ -79,7 +79,8 @@ function App() {
         <Route path="/" element={<Navigate to="/quiz" replace />} />
         <Route path="/quiz" element={<Quiz />} />
         <Route path="/dashboard" element={
-          <ProtectedRoute password={DASHBOARD_PASSWORD}>
+          <ProtectedRoute password={DASHBOARD_PASSWORD}
+          background="https://res.cloudinary.com/dpcojkrta/image/upload/v1780321868/Imagen_dashboard_seguridad_xjr0sj.png">
             <Dashboard />
           </ProtectedRoute>
         } />

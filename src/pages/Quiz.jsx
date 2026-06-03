@@ -109,6 +109,10 @@ export default function Quiz() {
     return () => supabase.removeChannel(sub)
   }, [])
 
+  useEffect(() => {
+  document.title = 'Quiz Wildcard'
+}, [])
+
   async function fetchEstado() {
     const { data } = await supabase.from('evento_estado').select('*').eq('id', 1).single()
     if (data) setCapituloActivo(data.capitulo_activo)
@@ -328,7 +332,7 @@ export default function Quiz() {
             <p className="text-[#C9A84C] text-xs mb-1 animate-pulse">▶ SIMULACIÓN FINALIZADA</p>
             <h2 className="text-white text-xl font-bold mb-4">Aviso de privacidad</h2>
             <p className="text-gray-400 text-sm mb-6">
-              Los datos que ingresaste junto con información técnica de tu dispositivo serán utilizados <span className="text-white">únicamente como parte de esta simulación</span>. No serán almacenados permanentemente ni compartidos fuera de este evento.
+              Los datos que ingresaste junto con información de tu dispositivo serán utilizados <span className="text-white">únicamente como parte de esta simulación</span>. No serán almacenados permanentemente ni compartidos fuera de este evento.
             </p>
             <button
               onClick={handleSubmit}
