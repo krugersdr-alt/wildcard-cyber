@@ -3,19 +3,33 @@ import { supabase } from '../lib/supabase'
 
 const BACKGROUND = 'https://res.cloudinary.com/dpcojkrta/image/upload/v1780321868/Imagen_dashboard_seguridad_xjr0sj.png'
 
-function generateLines(p) {
+const COLORS = [
+  'text-red-400',
+  'text-green-400',
+  'text-blue-400',
+  'text-yellow-400',
+  'text-purple-400',
+  'text-teal-400',
+  'text-orange-400',
+  'text-pink-400',
+  'text-cyan-400',
+  'text-lime-400',
+]
+
+function generateLines(p, colorIdx) {
+  const color = COLORS[colorIdx % COLORS.length]
   const ts = () => {
     const d = new Date()
     return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`
   }
   return [
-    { text: `[${ts()}] IDENTITY_BREACH · ${p.email_ficticio}`, color: 'text-red-400' },
-    { text: `[${ts()}] USER_RESOLVED · ${p.nombre} ${p.apellido} · ${p.cargo}`, color: 'text-yellow-400' },
-    { text: `[${ts()}] ORG_MAPPED · ${p.empresa}`, color: 'text-yellow-300' },
-    { text: `[${ts()}] NETWORK_TRACE · ${p.ip} · ${p.ciudad}, ${p.pais}`, color: 'text-orange-400' },
-    { text: `[${ts()}] DEVICE_FINGERPRINT · ${p.dispositivo} · ${p.sistema_operativo} · ${p.navegador}`, color: 'text-purple-400' },
-    { text: `[${ts()}] SCORE_EXTRACTED · decisiones_correctas=${p.score ?? 0}/4`, color: 'text-teal-400' },
-    { text: `[${ts()}] RECORD_EXFILTRATED · ${p.email_ficticio} ✓`, color: 'text-green-400' },
+    { text: `[${ts()}] IDENTITY_BREACH · ${p.email_ficticio}`, color },
+    { text: `[${ts()}] USER_RESOLVED · ${p.nombre} ${p.apellido} · ${p.cargo}`, color },
+    { text: `[${ts()}] ORG_MAPPED · ${p.empresa}`, color },
+    { text: `[${ts()}] NETWORK_TRACE · ${p.ip} · ${p.ciudad}, ${p.pais}`, color },
+    { text: `[${ts()}] DEVICE_FINGERPRINT · ${p.dispositivo} · ${p.sistema_operativo} · ${p.navegador}`, color },
+    { text: `[${ts()}] SCORE_EXTRACTED · decisiones_correctas=${p.score ?? 0}/4`, color },
+    { text: `[${ts()}] RECORD_EXFILTRATED · ${p.email_ficticio} ✓`, color },
     { text: `──────────────────────────────────────────`, color: 'text-gray-700' },
   ]
 }
@@ -62,13 +76,11 @@ export default function Dashboard() {
     setCols([[], [], []])
     setStreamDone(false)
 
-    // Round-robin: participante 0 → col 0, participante 1 → col 1, etc.
     const bloques = participantes.map((p, idx) => ({
       col: idx % 3,
-      lines: generateLines(p),
+      lines: generateLines(p, idx),
     }))
 
-    // Cada participante se muestra completo antes de pasar al siguiente
     for (let bloqueIdx = 0; bloqueIdx < bloques.length; bloqueIdx++) {
       const bloque = bloques[bloqueIdx]
       for (let lineIdx = 0; lineIdx < bloque.lines.length; lineIdx++) {
