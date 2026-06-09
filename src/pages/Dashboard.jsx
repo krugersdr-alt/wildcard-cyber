@@ -16,6 +16,60 @@ const COLORS = [
   'text-lime-400',
 ]
 
+const CAPITULOS_META = [
+  {
+    id: 1,
+    titulo: 'Cap. 1 — La sesión que no era',
+    opciones: [
+      { letra: 'A', texto: 'Reset + continuar board' },
+      { letra: 'B', texto: 'Aislar + cancelar board' },
+      { letra: 'C', texto: 'Aislar + board limpio + investigar' },
+    ],
+    correcta: 'C',
+  },
+  {
+    id: 2,
+    titulo: 'Cap. 2 — El correo que venía de adentro',
+    opciones: [
+      { letra: 'A', texto: 'Aprobar transferencia' },
+      { letra: 'B', texto: 'Llamar a Patricia' },
+      { letra: 'C', texto: 'Dual-approval out-of-band' },
+    ],
+    correcta: 'C',
+  },
+  {
+    id: 3,
+    titulo: 'Cap. 3 — El portátil que viajó solo',
+    opciones: [
+      { letra: 'A', texto: 'Bloquear acceso temporal' },
+      { letra: 'B', texto: 'Permitir + registrar manualmente' },
+      { letra: 'C', texto: 'Políticas MAM + session control' },
+    ],
+    correcta: 'C',
+  },
+  {
+    id: 4,
+    titulo: 'Cap. 4 — El contrato y la IA',
+    opciones: [
+      { letra: 'A', texto: 'Análisis de multas regulatorias' },
+      { letra: 'B', texto: 'DLP + bloquear IA externa' },
+      { letra: 'C', texto: 'Alternativa corporativa (Copilot)' },
+      { letra: 'D', texto: 'Acelerar adopción IA corporativa' },
+    ],
+    correcta: null,
+  },
+  {
+    id: 5,
+    titulo: 'Cap. 5 — El silo que faltó cruzar',
+    opciones: [
+      { letra: 'A', texto: 'Ignorar alertas' },
+      { letra: 'B', texto: 'Escalar por separado' },
+      { letra: 'C', texto: 'Correlacionar + respuesta unificada' },
+    ],
+    correcta: 'C',
+  },
+]
+
 function generateLines(p, colorIdx) {
   const color = COLORS[colorIdx % COLORS.length]
   const ts = () => {
@@ -34,22 +88,105 @@ function generateLines(p, colorIdx) {
   ]
 }
 
+function BarChart({ capMeta, respuestas }) {
+  const conteo = {}
+  capMeta.opciones.forEach((op) => { conteo[op.letra] = 0 })
+  respuestas.forEach((r) => {
+    if (conteo[r.respuesta] !== undefined) conteo[r.respuesta]++
+  })
+
+  const total = respuestas.length
+  const maxVal = Math.max(...Object.values(conteo), 1)
+
+  return (
+    <div className="bg-black/70 border border-gray-800 rounded p-4 flex flex-col gap-2 min-w-[200px]">
+      <p className="text-[#C9A84C] text-xs font-bold mb-1">{capMeta.titulo}</p>
+      <p className="text-gray-500 text-xs mb-2">{total} {total === 1 ? 'respuesta' : 'respuestas'}</p>
+      {capMeta.opciones.map((op) => {
+        const count = conteo[op.letra] || 0
+        const pct = total > 0 ? Math.round((count / total) * 100) : 0
+        const barPct = Math.round((count / maxVal) * 100)
+        const isCorrect = capMeta.correcta && op.letra === capMeta.correcta
+        const barColor = isCorrect ? 'bg-green-500' : 'bg-gray-600'
+        const labelColor = isCorrect ? 'text-green-400' : 'text-gray-300'
+
+        return (
+          <div key={op.letra}>
+            <div className="flex items-center justify-between mb-0.5">
+              <span className={`text-xs font-mono ${labelColor} flex items-center gap-1`}>
+                <span className="font-bold">{op.letra}</span>
+                {isCorrect && <span className="text-green-400 text-xs">✓</span>}
+              </span>
+              <span className="text-xs text-gray-400 font-mono">{count} <span className="text-gray-600">({pct}%)</span></span>
+            </div>
+            <div className="w-full bg-gray-900 rounded h-2">
+              <div
+                className={`h-2 rounded transition-all duration-500 ${barColor}`}
+                style={{ width: `${barPct}%` }}
+              />
+            </div>
+            <p className="text-gray-600 text-xs mt-0.5 truncate">{op.texto}</p>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const [participantes, setParticipantes] = useState([])
   const [streaming, setStreaming] = useState(false)
   const [cols, setCols] = useState([[], [], []])
   const [streamDone, setStreamDone] = useState(false)
+  const [capituloActivo, setCapituloActivo] = useState(0)
+  const [respuestasCapitulo, setRespuestasCapitulo] = useState([])
+  const [capitulosVisibles, setCapitulosVisibles] = useState([])
   const bottomRef = useRef(null)
 
   useEffect(() => {
     fetchParticipantes()
-    const sub = supabase
+    fetchEstado()
+    fetchRespuestasCapitulo()
+
+    const subPart = supabase
       .channel('dashboard_participantes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'participantes' }, (payload) => {
         setParticipantes((prev) => [...prev, payload.new])
       })
       .subscribe()
-    return () => supabase.removeChannel(sub)
+
+    const subEstado = supabase
+      .channel('dashboard_estado')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'evento_estado' }, (payload) => {
+        const nuevo = payload.new.capitulo_activo
+        setCapituloActivo(nuevo)
+        if (nuevo >= 1 && nuevo <= 5) {
+          setCapitulosVisibles((prev) => {
+            const anterior = nuevo - 1
+            if (anterior >= 1 && !prev.includes(anterior)) {
+              return [...prev, anterior]
+            }
+            return prev
+          })
+        }
+        if (nuevo === 6) {
+          setCapitulosVisibles([1, 2, 3, 4, 5])
+        }
+      })
+      .subscribe()
+
+    const subResp = supabase
+      .channel('dashboard_respuestas')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'respuestas_capitulo' }, (payload) => {
+        setRespuestasCapitulo((prev) => [...prev, payload.new])
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(subPart)
+      supabase.removeChannel(subEstado)
+      supabase.removeChannel(subResp)
+    }
   }, [])
 
   useEffect(() => {
@@ -62,12 +199,34 @@ export default function Dashboard() {
     }
   }, [cols])
 
+  async function fetchEstado() {
+    const { data } = await supabase.from('evento_estado').select('*').eq('id', 1).single()
+    if (data) {
+      const cap = data.capitulo_activo
+      setCapituloActivo(cap)
+      if (cap >= 2 && cap <= 5) {
+        const visibles = []
+        for (let i = 1; i < cap; i++) visibles.push(i)
+        setCapitulosVisibles(visibles)
+      } else if (cap === 6) {
+        setCapitulosVisibles([1, 2, 3, 4, 5])
+      }
+    }
+  }
+
   async function fetchParticipantes() {
     const { data } = await supabase
       .from('participantes')
       .select('*')
       .order('created_at', { ascending: true })
     if (data) setParticipantes(data)
+  }
+
+  async function fetchRespuestasCapitulo() {
+    const { data } = await supabase
+      .from('respuestas_capitulo')
+      .select('*')
+    if (data) setRespuestasCapitulo(data)
   }
 
   async function iniciarStream() {
@@ -122,6 +281,25 @@ export default function Dashboard() {
             <p className="text-white text-4xl font-bold">{participantes.length}</p>
           </div>
         </div>
+
+        {/* GRAFICOS DE RESPUESTAS */}
+        {capitulosVisibles.length > 0 && (
+          <div>
+            <p className="text-gray-500 text-xs mb-3">INTELIGENCIA DE DECISIONES — ANÁLISIS POR CAPÍTULO</p>
+            <div className="grid grid-cols-5 gap-3">
+              {capitulosVisibles.map((capId) => {
+                const meta = CAPITULOS_META.find((c) => c.id === capId)
+                const respCap = respuestasCapitulo.filter((r) => r.capitulo === capId)
+                if (!meta) return null
+                return (
+                  <div key={capId} className="min-w-0">
+                    <BarChart capMeta={meta} respuestas={respCap} />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* TERMINAL 3 COLUMNAS */}
         <div className="bg-black/80 border border-gray-800 rounded flex flex-col overflow-hidden">
