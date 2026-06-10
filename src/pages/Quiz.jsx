@@ -184,10 +184,10 @@ const CAPITULOS = [
 
 function getOrCreateParticipanteId() {
   const key = 'wildcard_participante_id'
-  let id = sessionStorage.getItem(key)
+  let id = localStorage.getItem(key)
   if (!id) {
     id = crypto.randomUUID()
-    sessionStorage.setItem(key, id)
+    localStorage.setItem(key, id)
   }
   return id
 }
@@ -216,10 +216,23 @@ function nivelColor(nivel) {
 
 export default function Quiz() {
   const [capituloActivo, setCapituloActivo] = useState(null)
-  const [registrado, setRegistrado] = useState(false)
-  const [form, setForm] = useState({ nombre: '', apellido: '', empresa: '', cargo: '' })
-  const [respuestas, setRespuestas] = useState({})
-  const [respondidos, setRespondidos] = useState({})
+
+  const [registrado, setRegistrado] = useState(
+    localStorage.getItem('wc_registrado') === 'true'
+  )
+
+  const [form, setForm] = useState(
+    JSON.parse(localStorage.getItem('wc_form') || '{"nombre":"","apellido":"","empresa":"","cargo":""}')
+  )
+
+  const [respuestas, setRespuestas] = useState(
+    JSON.parse(localStorage.getItem('wc_respuestas') || '{}')
+  )
+
+  const [respondidos, setRespondidos] = useState(
+    JSON.parse(localStorage.getItem('wc_respondidos') || '{}')
+  )
+
   const [glitch, setGlitch] = useState(false)
   const [villainVisible, setVillainVisible] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -247,11 +260,21 @@ export default function Quiz() {
   }
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
-  const handleRegistro = () => setRegistrado(true)
+
+  const handleRegistro = () => {
+    localStorage.setItem('wc_registrado', 'true')
+    localStorage.setItem('wc_form', JSON.stringify(form))
+    setRegistrado(true)
+  }
 
   const handleVoto = async (capId, letra) => {
-    setRespuestas({ ...respuestas, [capId]: letra })
-    setRespondidos({ ...respondidos, [capId]: true })
+    const nuevasRespuestas = { ...respuestas, [capId]: letra }
+    const nuevosRespondidos = { ...respondidos, [capId]: true }
+
+    setRespuestas(nuevasRespuestas)
+    setRespondidos(nuevosRespondidos)
+    localStorage.setItem('wc_respuestas', JSON.stringify(nuevasRespuestas))
+    localStorage.setItem('wc_respondidos', JSON.stringify(nuevosRespondidos))
 
     const participanteId = getOrCreateParticipanteId()
     await supabase.from('respuestas_capitulo').insert([{
@@ -284,6 +307,12 @@ export default function Quiz() {
       respuestas: JSON.stringify(respuestas),
       created_at: new Date().toISOString()
     }])
+
+    localStorage.removeItem('wc_registrado')
+    localStorage.removeItem('wc_form')
+    localStorage.removeItem('wc_respuestas')
+    localStorage.removeItem('wc_respondidos')
+    localStorage.removeItem('wildcard_participante_id')
 
     setDatosRobados({ fakeEmail, ip: ipData.ip, ciudad: ipData.city, pais: ipData.country, dispositivo: deviceInfo.device, os: deviceInfo.os, score })
     setLoading(false)
